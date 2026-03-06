@@ -1,0 +1,125 @@
+{
+  "project": {
+    "name": "Kodin",
+    "meaning": "K + code. Named after Kowshick's initial.",
+    "type": "Terminal-based code editor",
+    "language": "Python",
+    "goal": "Build a lightweight customizable hacker-style code editor and IDE over time.",
+    "project_start": "Summer 2026"
+  },
+
+  "creator": {
+    "name": "Kowshick Ahmed Abir",
+    "alias": "Kowsyke",
+    "environment": {
+      "os": "Fedora Linux",
+      "desktop": "KDE Plasma",
+      "shell": "zsh",
+      "terminal": "Konsole"
+    }
+  },
+
+  "philosophy": {
+    "editor_style": "Terminal-first development environment",
+    "design_goal": "Minimal, fast, hacker-oriented editor",
+    "inspiration": [
+      "VS Code",
+      "Neovim",
+      "Nano",
+      "Helix"
+    ],
+    "learning_objectives": [
+      "Understand text editor architecture",
+      "Learn terminal rendering",
+      "Understand buffers and cursors",
+      "Implement syntax highlighting",
+      "Learn Language Server Protocol integration"
+    ]
+  },
+
+  "project_structure": {
+    "root": "Projects/Kodin",
+    "directories": {
+      "core": "editor logic and text buffer",
+      "ui": "terminal rendering and display",
+      "utils": "file loading and helper functions"
+    },
+    "files": {
+      "kodin.py": "main entry point",
+      "core/editor.py": "editor control logic",
+      "core/buffer.py": "text storage and manipulation",
+      "ui/render.py": "screen drawing",
+      "utils/files.py": "file loading and saving"
+    }
+  },
+
+  "current_version": {
+    "version": "0.1",
+    "features": [
+      "Open file",
+      "Display file contents with line numbers",
+      "Append text lines",
+      "Save file"
+    ]
+  },
+
+  "prototype_code_behavior": {
+    "open_file": "Reads file into a buffer",
+    "display_lines": "Shows numbered lines",
+    "input_loop": "Allows user to append text",
+    "save": "Writes buffer back to file"
+  },
+
+  "future_roadmap": {
+    "v0.2": [
+      "cursor movement",
+      "arrow key navigation"
+    ],
+    "v0.3": [
+      "real-time editing",
+      "insert/delete text"
+    ],
+    "v0.4": [
+      "syntax highlighting"
+    ],
+    "v0.5": [
+      "project file explorer",
+      "file switching"
+    ],
+    "v0.6": [
+      "search and replace"
+    ],
+    "v0.7": [
+      "Git integration"
+    ],
+    "v0.8": [
+      "plugin system"
+    ],
+    "v0.9": [
+      "terminal panel"
+    ],
+    "v1.0": [
+      "Language Server Protocol support",
+      "autocomplete",
+      "go-to-definition"
+    ]
+  },
+
+  "technical_concepts_to_learn": [
+    "text buffer data structures",
+    "terminal rendering loops",
+    "keyboard event handling",
+    "syntax parsing",
+    "language servers",
+    "plugin architecture"
+  ],
+
+  "long_term_vision": {
+    "goal": "Transform Kodin into a personal programmable IDE",
+    "possible_future_languages": [
+      "Rust rewrite for performance",
+      "Python prototype stage"
+    ],
+    "editor_identity": "A hacker-style customizable editor for terminal users"
+  }
+}
