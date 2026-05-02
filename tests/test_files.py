@@ -1,5 +1,3 @@
-import os
-import tempfile
 import pytest
 from utils.files import load_file, save_file
 
