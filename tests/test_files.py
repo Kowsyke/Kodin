@@ -9,9 +9,9 @@ def test_load_file_returns_list_of_strings(tmp_path):
     assert result == ["hello", "world"]
 
 
-def test_load_file_missing_file_returns_empty_list():
+def test_load_file_missing_file_returns_one_blank_line():
     result = load_file("/tmp/kodin_nonexistent_xyz.txt")
-    assert result == []
+    assert result == [""]
 
 
 def test_load_file_empty_file_returns_empty_list(tmp_path):
@@ -21,14 +21,14 @@ def test_load_file_empty_file_returns_empty_list(tmp_path):
     assert result == []
 
 
-def test_save_file_writes_content(tmp_path):
+def test_save_file_writes_content_with_trailing_newline(tmp_path):
     f = tmp_path / "out.txt"
     save_file(str(f), "line1\nline2")
-    assert f.read_text() == "line1\nline2"
+    assert f.read_text() == "line1\nline2\n"
 
 
 def test_save_file_overwrites_existing_content(tmp_path):
     f = tmp_path / "out.txt"
     f.write_text("old content")
     save_file(str(f), "new content")
-    assert f.read_text() == "new content"
+    assert f.read_text() == "new content\n"

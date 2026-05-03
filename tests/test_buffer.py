@@ -93,13 +93,22 @@ def test_move_right_at_end_of_line_wraps_to_next_line():
     assert buf.cursor_x == 0
 
 
-def test_move_right_at_end_of_last_line_does_nothing():
+def test_move_right_at_end_of_last_line_clamps_in_normal_mode():
     buf = TextBuffer()
     buf.load(["hi"])
     buf.cursor_x = 2
-    buf.move_right()
+    buf.move_right()  # insert_mode=False by default
     assert buf.cursor_y == 0
-    assert buf.cursor_x == 2
+    assert buf.cursor_x == 1  # clamped to len("hi") - 1
+
+
+def test_move_right_at_end_of_last_line_stays_in_insert_mode():
+    buf = TextBuffer()
+    buf.load(["hi"])
+    buf.cursor_x = 2
+    buf.move_right(insert_mode=True)
+    assert buf.cursor_y == 0
+    assert buf.cursor_x == 2  # no clamp in insert mode
 
 
 def test_move_left_decrements_cursor_x():
@@ -240,3 +249,144 @@ def test_get_lines_returns_current_lines():
     buf = TextBuffer()
     buf.load(["a", "b"])
     assert buf.get_lines() == ["a", "b"]
+
+
+# --- delete_char_under (vim 'x') ---
+
+def test_delete_char_under_removes_char_at_cursor():
+    buf = TextBuffer()
+    buf.load(["hello"])
+    buf.cursor_x = 1
+    buf.delete_char_under()
+    assert buf.lines[0] == "hllo"
+    assert buf.cursor_x == 1
+
+
+def test_delete_char_under_last_char_clamps_cursor():
+    buf = TextBuffer()
+    buf.load(["ab"])
+    buf.cursor_x = 1  # at 'b', the last char
+    buf.delete_char_under()
+    assert buf.lines[0] == "a"
+    assert buf.cursor_x == 0  # clamped to len("a") - 1
+
+
+def test_delete_char_under_on_empty_line_does_nothing():
+    buf = TextBuffer()
+    buf.load([""])
+    buf.delete_char_under()
+    assert buf.lines[0] == ""
+    assert buf.cursor_x == 0
+
+
+def test_delete_char_under_sets_modified():
+    buf = TextBuffer()
+    buf.load(["ab"])
+    buf.cursor_x = 0
+    buf.delete_char_under()
+    assert buf.modified is True
+
+
+# --- delete_line (vim 'dd') ---
+
+def test_delete_line_removes_current_line():
+    buf = TextBuffer()
+    buf.load(["a", "b", "c"])
+    buf.cursor_y = 1
+    buf.delete_line()
+    assert buf.lines == ["a", "c"]
+    assert buf.cursor_y == 1
+
+
+def test_delete_line_last_line_clamps_cursor_y():
+    buf = TextBuffer()
+    buf.load(["a", "b"])
+    buf.cursor_y = 1
+    buf.delete_line()
+    assert buf.lines == ["a"]
+    assert buf.cursor_y == 0
+
+
+def test_delete_line_only_line_replaces_with_blank():
+    buf = TextBuffer()
+    buf.load(["hello"])
+    buf.delete_line()
+    assert buf.lines == [""]
+    assert buf.cursor_y == 0
+
+
+def test_delete_line_sets_modified():
+    buf = TextBuffer()
+    buf.load(["a", "b"])
+    buf.delete_line()
+    assert buf.modified is True
+
+
+# --- open_line_below ---
+
+def test_open_line_below_inserts_blank_line_after_current():
+    buf = TextBuffer()
+    buf.load(["hello", "world"])
+    buf.cursor_y = 0
+    buf.open_line_below()
+    assert buf.lines == ["hello", "", "world"]
+    assert buf.cursor_y == 1
+    assert buf.cursor_x == 0
+
+
+# --- open_line_above ---
+
+def test_open_line_above_inserts_blank_line_before_current():
+    buf = TextBuffer()
+    buf.load(["hello", "world"])
+    buf.cursor_y = 1
+    buf.open_line_above()
+    assert buf.lines == ["hello", "", "world"]
+    assert buf.cursor_y == 1
+    assert buf.cursor_x == 0
+
+
+# --- jump navigation ---
+
+def test_move_to_line_start_sets_cursor_x_to_zero():
+    buf = TextBuffer()
+    buf.load(["hello"])
+    buf.cursor_x = 3
+    buf.move_to_line_start()
+    assert buf.cursor_x == 0
+
+
+def test_move_to_line_end_normal_mode():
+    buf = TextBuffer()
+    buf.load(["hello"])
+    buf.move_to_line_end()
+    assert buf.cursor_x == 4  # max index = len("hello") - 1
+
+
+def test_move_to_line_end_insert_mode():
+    buf = TextBuffer()
+    buf.load(["hello"])
+    buf.move_to_line_end(insert_mode=True)
+    assert buf.cursor_x == 5  # one past end, valid for insertion
+
+
+def test_move_to_line_end_empty_line_normal_mode():
+    buf = TextBuffer()
+    buf.load([""])
+    buf.move_to_line_end()
+    assert buf.cursor_x == 0  # max(0 - 1, 0) = 0
+
+
+def test_move_to_first_line():
+    buf = TextBuffer()
+    buf.load(["a", "b", "c"])
+    buf.cursor_y = 2
+    buf.move_to_first_line()
+    assert buf.cursor_y == 0
+
+
+def test_move_to_last_line():
+    buf = TextBuffer()
+    buf.load(["a", "b", "c"])
+    buf.move_to_last_line()
+    assert buf.cursor_y == 2

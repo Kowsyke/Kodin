@@ -23,6 +23,8 @@ class Editor:
         self.command_buf = ""
         self.status_msg = ""
         self._quit = False
+        self._pending_d = False  # tracks first 'd' of 'dd' sequence
+        self._pending_g = False  # tracks first 'g' of 'gg' sequence
 
     def start(self):
         lines = load_file(self.filepath)
@@ -52,6 +54,24 @@ class Editor:
             self._handle_command(key)
 
     def _handle_normal(self, key):
+        # --- two-key sequence guards (must be first) ---
+
+        if self._pending_d:
+            self._pending_d = False
+            if key == ord("d"):
+                self.buffer.delete_line()
+                return
+            # key was not the second 'd': fall through and process it normally
+
+        elif self._pending_g:
+            self._pending_g = False
+            if key == ord("g"):
+                self.buffer.move_to_first_line()
+                return
+            # key was not the second 'g': fall through and process it normally
+
+        # --- single-key bindings ---
+
         if key in (ord("h"), curses.KEY_LEFT):
             self.buffer.move_left()
         elif key in (ord("j"), curses.KEY_DOWN):
@@ -59,18 +79,36 @@ class Editor:
         elif key in (ord("k"), curses.KEY_UP):
             self.buffer.move_up()
         elif key in (ord("l"), curses.KEY_RIGHT):
-            self.buffer.move_right()
+            self.buffer.move_right(insert_mode=False)
         elif key == ord("i"):
             self.mode = INSERT
+        elif key == ord("I"):
+            self.buffer.move_to_line_start()
+            self.mode = INSERT
         elif key == ord("a"):
-            # append: enter INSERT after the current character
-            self.buffer.move_right()
+            self.buffer.move_right(insert_mode=True)
+            self.mode = INSERT
+        elif key == ord("A"):
+            self.buffer.move_to_line_end(insert_mode=True)
             self.mode = INSERT
         elif key == ord("o"):
-            # open new line below current line
-            self.buffer.cursor_x = len(self.buffer.lines[self.buffer.cursor_y])
-            self.buffer.insert_newline()
+            self.buffer.open_line_below()
             self.mode = INSERT
+        elif key == ord("O"):
+            self.buffer.open_line_above()
+            self.mode = INSERT
+        elif key == ord("x"):
+            self.buffer.delete_char_under()
+        elif key == ord("d"):
+            self._pending_d = True
+        elif key == ord("g"):
+            self._pending_g = True
+        elif key == ord("G"):
+            self.buffer.move_to_last_line()
+        elif key == ord("0"):
+            self.buffer.move_to_line_start()
+        elif key == ord("$"):
+            self.buffer.move_to_line_end(insert_mode=False)
         elif key == ord(":"):
             self.mode = COMMAND
             self.command_buf = ""
@@ -80,6 +118,9 @@ class Editor:
             self.mode = NORMAL
             if self.buffer.cursor_x > 0:
                 self.buffer.move_left()
+            # Clamp after the move_left to ensure cursor sits on a real character
+            line = self.buffer.lines[self.buffer.cursor_y]
+            self.buffer.cursor_x = min(self.buffer.cursor_x, max(len(line) - 1, 0))
         elif key in (curses.KEY_BACKSPACE, 127, 8):
             self.buffer.delete_char()
         elif key in (10, 13):  # Enter
@@ -91,7 +132,7 @@ class Editor:
         elif key == curses.KEY_LEFT:
             self.buffer.move_left()
         elif key == curses.KEY_RIGHT:
-            self.buffer.move_right()
+            self.buffer.move_right(insert_mode=True)
         elif 32 <= key <= 126:  # printable ASCII
             self.buffer.insert_char(chr(key))
 
@@ -116,9 +157,8 @@ class Editor:
             self.status_msg = f"Saved {self.filepath}"
         elif cmd == "q":
             if self.buffer.modified:
+                # Only set status_msg here. _handle_command resets mode/command_buf.
                 self.status_msg = "Unsaved changes. Use :q! to force quit or :wq to save and quit."
-                self.mode = NORMAL
-                self.command_buf = ""
             else:
                 self._quit = True
         elif cmd == "q!":
