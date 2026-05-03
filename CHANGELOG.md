@@ -7,10 +7,67 @@ All notable changes to Kodin are documented here.
 ## [Unreleased] - Targeting v1.0
 
 ### Planned
-- Scroll offset for files longer than the terminal height
-- Syntax highlighting
-- Line count in status bar
+- move_up/move_down cursor_x clamping to NORMAL mode range
+- Tab character display and cursor alignment
+- Syntax highlighting (Python first, via regex)
 - Search with /
+- Word-level movement: w, b, e
+- Relative line numbers in gutter
+
+---
+
+## [0.3] - 2026-05-03
+
+### Fixed (utils/files.py)
+- `load_file` now returns `[""]` on `FileNotFoundError` instead of `[]`, so
+  opening a nonexistent file starts a blank buffer instead of crashing.
+- `save_file` now appends a trailing newline to all saved files (POSIX compliance).
+  The fix lives in `save_file`, not in `buffer.save()`, which stays pure.
+
+### Fixed (core/buffer.py)
+- `move_right()` gains an `insert_mode=False` parameter. In NORMAL mode the cursor
+  can no longer sit past the last character of a line; it clamps to `len(line) - 1`.
+  INSERT mode and the 'a' binding pass `insert_mode=True` to allow the cursor after
+  the last character.
+- The 'o' (open line below) binding no longer directly mutates `buffer.cursor_x`
+  from the editor. A new `open_line_below()` method encapsulates the operation.
+- `_execute_command(':q')` no longer sets `self.mode` or `self.command_buf`; those
+  are now managed entirely by `_handle_command()`, removing a fragile double-write.
+- ESC from INSERT mode now explicitly clamps `cursor_x` to the last valid NORMAL
+  mode position after the move_left call.
+
+### Added (core/buffer.py)
+- `delete_char_under()`: deletes the character at the cursor (vim 'x'); clamps
+  cursor after deletion.
+- `delete_line()`: deletes the entire current line (vim 'dd'); preserves a minimum
+  of one line in the buffer.
+- `open_line_below()`: inserts a blank line below the current line (vim 'o').
+- `open_line_above()`: inserts a blank line above the current line (vim 'O').
+- `move_to_line_start()`: sets cursor_x to 0 (vim '0').
+- `move_to_line_end(insert_mode=False)`: moves cursor to last char (NORMAL) or one
+  past it (INSERT); covers vim '$' and 'A'.
+- `move_to_first_line()`: jumps to line 0 (vim 'gg').
+- `move_to_last_line()`: jumps to last line (vim 'G').
+- `_clamp_x()`: private helper used by jump and delete operations to keep
+  cursor_x in valid NORMAL mode range.
+
+### Fixed (ui/render.py)
+- Critical scroll bug: the renderer now tracks `scroll_y` (topmost visible line)
+  and calls `_adjust_scroll()` before every draw. Files of any length now display
+  and scroll correctly without curses errors.
+- Gutter width is now computed dynamically from `len(str(num_lines))` instead of
+  hardcoded to 4; files with 1000+ lines no longer overflow the gutter.
+- Tilde (`~`) rows are shown for screen rows past the end of the file (like vim).
+- Status bar now shows `[MODE] filename [+]` left-aligned and `line:col`
+  right-aligned. `[+]` appears only when the buffer has unsaved changes.
+
+### Added (core/editor.py)
+- NORMAL mode bindings: `x` (delete char under), `dd` (delete line), `0` (line
+  start), `$` (line end), `A` (append at end, enter INSERT), `I` (insert at start,
+  enter INSERT), `O` (open line above, enter INSERT), `G` (last line), `gg` (first
+  line).
+- Two-key sequence state: `_pending_d` for `dd` and `_pending_g` for `gg`. Handles
+  the "other key resets and processes normally" edge case.
 
 ---
 
