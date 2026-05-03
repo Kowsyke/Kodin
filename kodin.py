@@ -1,17 +1,14 @@
 # Kodin - kodin.py
 #
-# Entry point only. Parses the filename argument, creates an Editor,
-# and calls start(). All logic lives in core/ and ui/.
+# Entry point only. Parses the optional filename argument and runs KodinApp.
 
 import sys
-from core.editor import Editor
+from app import KodinApp
 
 
-def main():
-    if len(sys.argv) < 2:
-        print("Usage: python kodin.py <file>")
-        sys.exit(1)
-    Editor(sys.argv[1]).start()
+def main() -> None:
+    filepath = sys.argv[1] if len(sys.argv) > 1 else None
+    KodinApp(filepath=filepath).run()
 
 
 if __name__ == "__main__":

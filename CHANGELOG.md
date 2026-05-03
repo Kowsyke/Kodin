@@ -7,12 +7,42 @@ All notable changes to Kodin are documented here.
 ## [Unreleased] - Targeting v1.0
 
 ### Planned
-- move_up/move_down cursor_x clamping to NORMAL mode range
-- Tab character display and cursor alignment
 - Syntax highlighting (Python first, via regex)
 - Search with /
 - Word-level movement: w, b, e
 - Relative line numbers in gutter
+
+---
+
+## [0.4] - 2026-05-03
+
+### Changed
+- Replaced the entire curses stack with Textual 8.2.5. `core/editor.py` and
+  `ui/render.py` are deleted; all rendering, input handling, and layout now live
+  in Textual widgets.
+- `kodin.py` is now four lines: creates `KodinApp` and calls `.run()`.
+- `core/buffer.py` and `utils/files.py` are unchanged.
+
+### Added
+- `app.py`: `KodinApp(App)` with five global bindings (ctrl+b/t/k/q/s) and a
+  three-panel layout: sidebar / editor-row / terminal / status-bar.
+- `ui/editor_widget.py`: `EditorWidget(Widget)` with full NORMAL/INSERT/COMMAND
+  modal editing, all v0.3 vim bindings, Rich Text rendering with neon-cyan cursor
+  and line highlight, scroll management, and a `StatusChanged` message.
+- `ui/file_tree.py`: `FileTreePanel(Widget)` wrapping Textual `DirectoryTree`.
+  Selecting a file loads it into the editor.
+- `ui/status_bar.py`: `StatusBar(Static)` listening for `StatusChanged` messages.
+  Renders mode block in color (cyan/green/red per mode), filename, `[+]` in orange,
+  and `line:col`.
+- `ui/claude_panel.py`: `ClaudePanel(Widget)` with `RichLog`, `Input`, and `Button`.
+  Streams responses from `claude-sonnet-4-6` via the Anthropic SDK using
+  `@work(thread=True)`. Conversation history capped at 20 messages. Toggle with ctrl+k.
+- `ui/terminal_panel.py`: `TerminalPanel(Widget)` with a real pty subprocess shell.
+  Output streamed via `@work(thread=True)` into `RichLog`. Keyboard input forwarded
+  to the pty. Toggle with ctrl+t.
+- `kodin.tcss`: full dark hacker aesthetic. Neon cyan accent, near-black background,
+  all layout sizing in CSS variables.
+- `requirements.txt`: `textual>=8.2.5`, `anthropic>=0.25.0`.
 
 ---
 

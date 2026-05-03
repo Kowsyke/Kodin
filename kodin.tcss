@@ -1,0 +1,118 @@
+/* Kodin - kodin.tcss
+ *
+ * Dark hacker terminal aesthetic. Neon cyan on near-black.
+ * All layout sizing lives here so Python widgets stay clean.
+ */
+
+$bg:          #0a0e14;
+$bg-panel:    #0d1117;
+$bg-sidebar:  #080c10;
+$border:      #1e2a38;
+$accent:      #00d4ff;
+$accent-dim:  #007a94;
+$text:        #c9d1d9;
+$text-dim:    #586069;
+$green:       #39d353;
+$orange:      #ff7b00;
+$red:         #ff4444;
+$purple:      #a371f7;
+
+App {
+    background: $bg;
+}
+
+/* Top-level split: sidebar | main */
+#root-split {
+    height: 1fr;
+}
+
+FileTreePanel {
+    background: $bg-sidebar;
+    border-right: tall $border;
+    width: 28;
+    padding: 0 1;
+    color: $text-dim;
+}
+
+FileTreePanel .panel-header {
+    color: $accent;
+    text-style: bold;
+    height: 1;
+}
+
+FileTreePanel DirectoryTree {
+    background: $bg-sidebar;
+    color: $text-dim;
+}
+
+/* Main content area */
+#main-content {
+    width: 1fr;
+}
+
+/* Editor + Claude side by side */
+#editor-row {
+    height: 1fr;
+}
+
+EditorWidget {
+    background: $bg;
+    color: $text;
+    width: 1fr;
+}
+
+ClaudePanel {
+    background: $bg-panel;
+    border-left: tall $border;
+    width: 40;
+    display: none;
+}
+
+ClaudePanel .claude-header {
+    background: $bg-sidebar;
+    color: $purple;
+    text-style: bold;
+    height: 1;
+    padding: 0 1;
+}
+
+ClaudePanel RichLog {
+    background: $bg-panel;
+    color: $text;
+    height: 1fr;
+}
+
+ClaudePanel #claude-input {
+    background: $bg-sidebar;
+    border: tall $accent-dim;
+    height: 3;
+    color: $text;
+}
+
+TerminalPanel {
+    background: #050810;
+    border-top: tall $border;
+    height: 12;
+    display: none;
+}
+
+TerminalPanel .terminal-header {
+    color: $accent;
+    text-style: bold;
+    height: 1;
+    padding: 0 1;
+    background: $bg-sidebar;
+}
+
+TerminalPanel RichLog {
+    color: $green;
+    background: #050810;
+    height: 1fr;
+}
+
+StatusBar {
+    background: $accent-dim;
+    color: $bg;
+    height: 1;
+    padding: 0 1;
+}
