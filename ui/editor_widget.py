@@ -1,14 +1,13 @@
 # Kodin - ui/editor_widget.py
 #
 # EditorWidget: the main editing surface. Owns a TextBuffer and implements
-# the full NORMAL/INSERT/COMMAND modal state machine from v0.3. Renders via
-# Rich Text (line numbers, cursor highlight, tilde rows). Posts StatusChanged
-# on every state change so the StatusBar stays in sync.
+# the full NORMAL/INSERT/COMMAND modal state machine. Renders via Rich Text
+# with line numbers, cursor highlight, and scroll. Posts StatusChanged on
+# every state change so StatusBar stays in sync.
 
 from __future__ import annotations
 
 from textual.widget import Widget
-from textual.app import ComposeResult
 from textual import events
 from textual.message import Message
 from rich.text import Text
@@ -21,7 +20,7 @@ NORMAL = "NORMAL"
 INSERT = "INSERT"
 COMMAND = "COMMAND"
 
-# Keys the App handles at the global level; EditorWidget lets them pass through.
+# Keys that the App handles globally -- let them pass through this widget.
 _APP_KEYS = frozenset({"ctrl+b", "ctrl+t", "ctrl+k", "ctrl+q", "ctrl+s"})
 
 
@@ -30,10 +29,10 @@ class EditorWidget(Widget):
 
     can_focus = True
 
-    # --- nested message ---
-
+    # ------------------------------------------------------------------
+    # Message emitted on every state change so StatusBar can update.
+    # ------------------------------------------------------------------
     class StatusChanged(Message):
-        """Posted whenever mode, cursor, or modified state changes."""
         def __init__(
             self,
             mode: str,
@@ -42,6 +41,7 @@ class EditorWidget(Widget):
             cursor_x: int,
             modified: bool,
             command_buf: str = "",
+            status_msg: str = "",
         ) -> None:
             super().__init__()
             self.mode = mode
@@ -50,8 +50,11 @@ class EditorWidget(Widget):
             self.cursor_x = cursor_x
             self.modified = modified
             self.command_buf = command_buf
+            self.status_msg = status_msg
 
-    # --- lifecycle ---
+    # ------------------------------------------------------------------
+    # Lifecycle
+    # ------------------------------------------------------------------
 
     def __init__(self, **kwargs: object) -> None:
         super().__init__(**kwargs)
@@ -59,7 +62,7 @@ class EditorWidget(Widget):
         self.filepath: str = ""
         self.mode: str = NORMAL
         self.command_buf: str = ""
-        self.scroll_y: int = 0
+        self._scroll_y: int = 0
         self._pending_d: bool = False
         self._pending_g: bool = False
         self._status_msg: str = ""
@@ -67,13 +70,14 @@ class EditorWidget(Widget):
     def on_mount(self) -> None:
         self._post_status()
 
-    # --- public API ---
+    # ------------------------------------------------------------------
+    # Public API called by KodinApp
+    # ------------------------------------------------------------------
 
     def load_file(self, path: str) -> None:
         self.filepath = path
-        lines = load_file(path)
-        self.buffer.load(lines)
-        self.scroll_y = 0
+        self.buffer.load(load_file(path))
+        self._scroll_y = 0
         self.mode = NORMAL
         self.command_buf = ""
         self._status_msg = ""
@@ -82,33 +86,31 @@ class EditorWidget(Widget):
 
     def save(self) -> None:
         if not self.filepath:
-            self._status_msg = "No filename. Use :w <name> to save."
-            self._post_status()
-            self.refresh()
+            self._status_msg = "No filename -- use :w <name>"
             return
         content = self.buffer.save()
         save_file(self.filepath, content)
         self._status_msg = f"Saved {self.filepath}"
-        self._post_status()
-        self.refresh()
 
     def get_selected_text(self) -> str:
-        """Return the current line for use as Claude context."""
+        """Return the current line for Claude context."""
         return self.buffer.lines[self.buffer.cursor_y]
 
-    # --- rendering ---
+    # ------------------------------------------------------------------
+    # Rendering
+    # ------------------------------------------------------------------
 
     def render(self) -> Text:
-        height = self.size.height
-        width = self.size.width
+        height = int(self.size.height)
+        width = int(self.size.width)
 
         if height <= 0 or width <= 0:
             return Text("")
 
         lines = self.buffer.get_lines()
         num_lines = len(lines)
-        gutter = max(len(str(num_lines)), 3) + 1
-        text_width = max(width - gutter, 1)
+        gutter_w = max(len(str(num_lines)), 3) + 1  # e.g. "  1 " = 4 chars
+        text_w = max(width - gutter_w, 1)
 
         self._adjust_scroll(height)
 
@@ -118,53 +120,62 @@ class EditorWidget(Widget):
         result = Text(no_wrap=True, overflow="crop")
 
         for row in range(height):
-            line_idx = self.scroll_y + row
-            is_cursor = line_idx == cy
-
             if row > 0:
                 result.append("\n")
 
+            line_idx = self._scroll_y + row
+            is_cursor_row = (line_idx == cy)
+
             if line_idx < num_lines:
-                num_str = f"{line_idx + 1:>{gutter - 1}} "
-                gutter_color = "#007a94" if is_cursor else "#586069"
+                # --- gutter ---
+                num_str = f"{line_idx + 1:>{gutter_w - 1}} "
+                gutter_color = "#00d4ff" if is_cursor_row else "#586069"
                 result.append(num_str, style=Style(color=gutter_color))
 
                 line = lines[line_idx]
 
-                if is_cursor:
-                    bg = Style(bgcolor="#111827", color="#c9d1d9")
-                    cur_style = Style(bgcolor="#00d4ff", color="#0a0e14", bold=True)
+                if is_cursor_row:
+                    line_bg = Style(bgcolor="#111827", color="#c9d1d9")
+                    cursor_style = Style(bgcolor="#00d4ff", color="#0a0e14", bold=True)
 
-                    before = line[:cx][:text_width]
-                    remaining = text_width - len(before)
-
-                    result.append(before, style=bg)
+                    # text before cursor
+                    before = line[:cx]
+                    result.append(before[:text_w], style=line_bg)
+                    remaining = text_w - min(len(before), text_w)
 
                     if remaining > 0:
-                        cursor_char = line[cx] if cx < len(line) else " "
-                        result.append(cursor_char, style=cur_style)
+                        # cursor character
+                        cur_ch = line[cx] if cx < len(line) else " "
+                        result.append(cur_ch, style=cursor_style)
                         remaining -= 1
 
                     if remaining > 0:
+                        # text after cursor
                         after = line[cx + 1:] if cx < len(line) else ""
-                        result.append(after[:remaining], style=bg)
-                        remaining -= len(after[:remaining])
+                        chunk = after[:remaining]
+                        result.append(chunk, style=line_bg)
+                        remaining -= len(chunk)
 
                     if remaining > 0:
-                        result.append(" " * remaining, style=bg)
+                        # pad to end of line so the bg highlight fills the row
+                        result.append(" " * remaining, style=line_bg)
                 else:
-                    result.append(line[:text_width], style=Style(color="#c9d1d9"))
+                    result.append(line[:text_w], style=Style(color="#c9d1d9"))
+
             else:
-                result.append(" " * (gutter - 1) + " ", style=Style(color="#586069"))
+                # past end of file: tilde rows
+                result.append(" " * (gutter_w - 1) + " ", style=Style(color="#586069"))
                 result.append("~", style=Style(color="#586069", dim=True))
 
         return result
 
-    # --- key handling ---
+    # ------------------------------------------------------------------
+    # Input
+    # ------------------------------------------------------------------
 
     async def on_key(self, event: events.Key) -> None:
         if event.key in _APP_KEYS:
-            return  # let App bindings fire
+            return  # let App-level bindings handle these
 
         event.stop()
 
@@ -182,23 +193,26 @@ class EditorWidget(Widget):
         self._post_status()
         self.refresh()
 
+    # ------------------------------------------------------------------
+    # Modal handlers
+    # ------------------------------------------------------------------
+
     def _handle_normal(self, key: str, char: str | None) -> None:
         self._status_msg = ""
 
-        # Two-key sequence guards must come first
+        # Two-key sequence guards must be checked first.
         if self._pending_d:
             self._pending_d = False
             if char == "d":
                 self.buffer.delete_line()
                 return
-            # Not the second 'd': fall through and process this key normally
+            # Fall through to process the new key normally.
 
         elif self._pending_g:
             self._pending_g = False
             if char == "g":
                 self.buffer.move_to_first_line()
                 return
-            # Not the second 'g': fall through
 
         # Single-key bindings
         if key in ("h", "left"):
@@ -243,6 +257,7 @@ class EditorWidget(Widget):
             self.command_buf = ""
 
     def _handle_insert(self, key: str, char: str | None) -> None:
+        self._status_msg = ""
         if key == "escape":
             self.mode = NORMAL
             if self.buffer.cursor_x > 0:
@@ -268,9 +283,10 @@ class EditorWidget(Widget):
             self.buffer.insert_char(char)
 
     def _handle_command(self, key: str, char: str | None) -> None:
+        self._status_msg = ""
         if key == "enter":
-            self._execute_command(self.command_buf)
-            if self.mode == COMMAND:  # not cleared by _execute_command exit path
+            self._execute_command(self.command_buf.strip())
+            if self.mode == COMMAND:
                 self.mode = NORMAL
                 self.command_buf = ""
         elif key == "escape":
@@ -286,14 +302,14 @@ class EditorWidget(Widget):
             self.save()
         elif cmd == "q":
             if self.buffer.modified:
-                self._status_msg = "Unsaved changes. Use :q! to force quit or :wq to save and quit."
+                self._status_msg = "Unsaved changes -- use :q! to force or :wq to save"
                 self.mode = NORMAL
                 self.command_buf = ""
             else:
                 self.app.exit()
         elif cmd == "q!":
             self.app.exit()
-        elif cmd == "wq":
+        elif cmd in ("wq", "x"):
             self.save()
             self.app.exit()
         else:
@@ -301,28 +317,30 @@ class EditorWidget(Widget):
             self.mode = NORMAL
             self.command_buf = ""
 
-    # --- helpers ---
+    # ------------------------------------------------------------------
+    # Helpers
+    # ------------------------------------------------------------------
 
     def _adjust_scroll(self, visible_height: int) -> None:
+        visible_height = int(visible_height)
         if visible_height <= 0:
             return
         cy = self.buffer.cursor_y
-        if cy < self.scroll_y:
-            self.scroll_y = cy
-        elif cy >= self.scroll_y + visible_height:
-            self.scroll_y = cy - visible_height + 1
-        self.scroll_y = max(0, self.scroll_y)
+        if cy < self._scroll_y:
+            self._scroll_y = cy
+        elif cy >= self._scroll_y + visible_height:
+            self._scroll_y = cy - visible_height + 1
+        self._scroll_y = max(0, self._scroll_y)
 
     def _post_status(self) -> None:
-        # If there is a transient status message, show it as filepath override
-        fp = self._status_msg if self._status_msg else self.filepath
         self.post_message(
             self.StatusChanged(
                 mode=self.mode,
-                filepath=fp,
+                filepath=self.filepath,
                 cursor_y=self.buffer.cursor_y,
                 cursor_x=self.buffer.cursor_x,
                 modified=self.buffer.modified,
                 command_buf=self.command_buf,
+                status_msg=self._status_msg,
             )
         )

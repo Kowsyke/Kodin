@@ -1,118 +1,177 @@
 /* Kodin - kodin.tcss
- *
- * Dark hacker terminal aesthetic. Neon cyan on near-black.
- * All layout sizing lives here so Python widgets stay clean.
- */
+   Dark hacker aesthetic. All sizing is explicit so nothing collapses. */
 
-$bg:          #0a0e14;
-$bg-panel:    #0d1117;
-$bg-sidebar:  #080c10;
-$border:      #1e2a38;
-$accent:      #00d4ff;
-$accent-dim:  #007a94;
-$text:        #c9d1d9;
-$text-dim:    #586069;
-$green:       #39d353;
-$orange:      #ff7b00;
-$red:         #ff4444;
-$purple:      #a371f7;
-
-App {
-    background: $bg;
+/* ---- Screen / root ---- */
+Screen {
+    background: #0a0e14;
+    layers: base;
 }
 
-/* Top-level split: sidebar | main */
+/* ---- Root horizontal split ---- */
 #root-split {
-    height: 1fr;
+    layout: horizontal;
+    width: 100%;
+    height: 100%;
+    background: #0a0e14;
 }
 
-FileTreePanel {
-    background: $bg-sidebar;
-    border-right: tall $border;
+/* ---- Sidebar ---- */
+#sidebar {
     width: 28;
-    padding: 0 1;
-    color: $text-dim;
+    height: 100%;
+    background: #080c10;
+    border-right: tall #1e2a38;
 }
 
-FileTreePanel .panel-header {
-    color: $accent;
-    text-style: bold;
+.panel-header {
+    width: 100%;
     height: 1;
+    background: #080c10;
+    color: #00d4ff;
+    text-style: bold;
+    padding: 0 1;
 }
 
-FileTreePanel DirectoryTree {
-    background: $bg-sidebar;
-    color: $text-dim;
+DirectoryTree {
+    width: 100%;
+    height: 1fr;
+    background: #080c10;
+    color: #586069;
+    scrollbar-background: #080c10;
+    scrollbar-color: #1e2a38;
 }
 
-/* Main content area */
+DirectoryTree > .directory-tree--folder {
+    color: #c9d1d9;
+}
+
+DirectoryTree > .directory-tree--file {
+    color: #586069;
+}
+
+DirectoryTree:focus .highlighted {
+    background: #007a94;
+    color: #c9d1d9;
+}
+
+/* ---- Main content column ---- */
 #main-content {
+    layout: vertical;
     width: 1fr;
+    height: 100%;
+    background: #0a0e14;
 }
 
-/* Editor + Claude side by side */
+/* ---- Editor row (editor + claude side by side) ---- */
 #editor-row {
+    layout: horizontal;
+    width: 100%;
     height: 1fr;
+    background: #0a0e14;
 }
 
-EditorWidget {
-    background: $bg;
-    color: $text;
+/* ---- Editor widget ---- */
+#editor {
     width: 1fr;
+    height: 100%;
+    background: #0a0e14;
+    color: #c9d1d9;
+    scrollbar-background: #0a0e14;
+    scrollbar-color: #1e2a38;
 }
 
-ClaudePanel {
-    background: $bg-panel;
-    border-left: tall $border;
+/* ---- Claude panel ---- */
+#claude-panel {
     width: 40;
+    height: 100%;
+    background: #0d1117;
+    border-left: tall #1e2a38;
     display: none;
 }
 
-ClaudePanel .claude-header {
-    background: $bg-sidebar;
-    color: $purple;
-    text-style: bold;
+.claude-header {
+    width: 100%;
     height: 1;
+    background: #080c10;
+    color: #a371f7;
+    text-style: bold;
     padding: 0 1;
 }
 
-ClaudePanel RichLog {
-    background: $bg-panel;
-    color: $text;
+#claude-log {
+    width: 100%;
     height: 1fr;
+    background: #0d1117;
+    color: #c9d1d9;
+    scrollbar-background: #0d1117;
+    scrollbar-color: #1e2a38;
 }
 
-ClaudePanel #claude-input {
-    background: $bg-sidebar;
-    border: tall $accent-dim;
+#claude-input {
+    width: 100%;
     height: 3;
-    color: $text;
+    background: #080c10;
+    color: #c9d1d9;
+    border: tall #007a94;
 }
 
-TerminalPanel {
-    background: #050810;
-    border-top: tall $border;
+#claude-input:focus {
+    border: tall #00d4ff;
+}
+
+#claude-clear {
+    width: 100%;
+    height: 1;
+    background: #1e2a38;
+    color: #586069;
+    border: none;
+    text-style: none;
+}
+
+#claude-clear:hover {
+    background: #1e2a38;
+    color: #c9d1d9;
+}
+
+ClaudePanel Button {
+    height: 1;
+    min-width: 7;
+    background: #080c10;
+    color: #586069;
+    border: none;
+}
+
+/* ---- Terminal panel ---- */
+#terminal-panel {
+    width: 100%;
     height: 12;
+    background: #050810;
+    border-top: tall #1e2a38;
     display: none;
 }
 
-TerminalPanel .terminal-header {
-    color: $accent;
-    text-style: bold;
+.terminal-header {
+    width: 100%;
     height: 1;
-    padding: 0 1;
-    background: $bg-sidebar;
-}
-
-TerminalPanel RichLog {
-    color: $green;
     background: #050810;
-    height: 1fr;
+    color: #00d4ff;
+    text-style: bold;
+    padding: 0 1;
 }
 
-StatusBar {
-    background: $accent-dim;
-    color: $bg;
+#term-log {
+    width: 100%;
+    height: 1fr;
+    background: #050810;
+    color: #39d353;
+    scrollbar-background: #050810;
+    scrollbar-color: #1e2a38;
+}
+
+/* ---- Status bar ---- */
+#status-bar {
+    width: 100%;
     height: 1;
-    padding: 0 1;
+    background: #007a94;
+    color: #0a0e14;
 }

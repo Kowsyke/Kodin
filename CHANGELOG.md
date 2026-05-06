@@ -44,6 +44,30 @@ All notable changes to Kodin are documented here.
   all layout sizing in CSS variables.
 - `requirements.txt`: `textual>=8.2.5`, `anthropic>=0.25.0`.
 
+### Fixed (2026-05-06 - v0.4.1 bugfixes)
+- **Blank screen** (critical): `Size.width` and `Size.height` return floats in
+  Textual 8.2.5. `render()` now casts both with `int()`. `_scroll_y` was also
+  renamed from `scroll_y` (which shadowed Textual's own reactive) to avoid the
+  attribute conflict causing the float to propagate into list indexing.
+- **save() double-post**: `save()` no longer calls `_post_status()` or `refresh()`
+  internally. The caller (`on_key` or `action_save`) is responsible, preventing a
+  race where the status message was cleared before being displayed.
+- **INSERT/COMMAND status messages**: `_status_msg` is now cleared at the top of
+  `_handle_insert()` and `_handle_command()`, not just `_handle_normal()`.
+- **Terminal starts eagerly**: `TerminalPanel` now lazily starts the shell via
+  `watch_display()` on first toggle, not on mount. This stops the pty from
+  consuming stdin before the user opens the terminal panel.
+- **Terminal ctrl+t passthrough**: Keys in `_TERM_PASSTHROUGH` (`ctrl+b/t/k/q`)
+  no longer stop at the terminal panel -- they bubble up to the App so the user
+  can close the terminal while typing in it.
+- **Claude streaming**: Response chunks are buffered and written line-by-line
+  instead of one entry per chunk. Escape in the Claude input returns focus to the
+  editor. A `---` divider separates conversation turns.
+- **CSS path**: `CSS_PATH` in `app.py` is now absolute (`Path(__file__).parent`)
+  so the app works regardless of the launch directory.
+- **utils/files.py**: Reverted an unauthorized modification. The file is stable
+  and must not be changed outside of explicit bug fixes.
+
 ---
 
 ## [0.3] - 2026-05-03

@@ -1,8 +1,7 @@
 # Kodin - ui/file_tree.py
 #
 # FileTreePanel: sidebar widget wrapping Textual's DirectoryTree.
-# Starts at the current working directory. When the user selects a file,
-# the DirectoryTree.FileSelected message bubbles up to the App.
+# FileSelected messages bubble to KodinApp automatically.
 
 from pathlib import Path
 
@@ -18,6 +17,4 @@ class FileTreePanel(Widget):
         yield DirectoryTree(Path.cwd(), id="dir-tree")
 
     def set_root(self, path: Path) -> None:
-        """Change the directory tree root (called by app when a file is opened)."""
-        tree = self.query_one("#dir-tree", DirectoryTree)
-        tree.path = path
+        self.query_one("#dir-tree", DirectoryTree).path = path
