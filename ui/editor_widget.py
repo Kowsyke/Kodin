@@ -1,16 +1,17 @@
 # Kodin - ui/editor_widget.py
 #
-# EditorWidget: the main editing surface. Owns a TextBuffer and implements
-# the full NORMAL/INSERT/COMMAND modal state machine. Renders via Rich Text
-# with line numbers, cursor highlight, and scroll. Posts StatusChanged on
-# every state change so StatusBar stays in sync.
+# EditorWidget: modal vim-style editing surface backed by TextBuffer.
+# Uses render_line(y) -> Strip for per-line rendering, bypassing Textual's
+# _layout_cache so the editor is always live. Posts StatusChanged on every
+# state change so StatusBar stays in sync.
 
 from __future__ import annotations
 
 from textual.widget import Widget
+from textual.strip import Strip
 from textual import events
 from textual.message import Message
-from rich.text import Text
+from rich.segment import Segment
 from rich.style import Style
 
 from core.buffer import TextBuffer
@@ -20,8 +21,17 @@ NORMAL = "NORMAL"
 INSERT = "INSERT"
 COMMAND = "COMMAND"
 
-# Keys that the App handles globally -- let them pass through this widget.
+# Keys the App handles globally -- EditorWidget lets them pass through.
 _APP_KEYS = frozenset({"ctrl+b", "ctrl+t", "ctrl+k", "ctrl+q", "ctrl+s"})
+
+# Precomputed styles (avoids constructing Style objects on every render_line call)
+_S_TEXT    = Style(color="#c9d1d9")
+_S_DIM     = Style(color="#586069")
+_S_ACCENT  = Style(color="#00d4ff")
+_S_TILDE   = Style(color="#586069", dim=True)
+_S_LINE_BG = Style(bgcolor="#111827", color="#c9d1d9")
+_S_CURSOR  = Style(bgcolor="#00d4ff", color="#0a0e14", bold=True)
+_S_BG      = Style(bgcolor="#0a0e14")
 
 
 class EditorWidget(Widget):
@@ -69,6 +79,7 @@ class EditorWidget(Widget):
 
     def on_mount(self) -> None:
         self._post_status()
+        self.refresh()
 
     # ------------------------------------------------------------------
     # Public API called by KodinApp
@@ -97,77 +108,77 @@ class EditorWidget(Widget):
         return self.buffer.lines[self.buffer.cursor_y]
 
     # ------------------------------------------------------------------
-    # Rendering
+    # Rendering -- one Strip per line, no global caching
     # ------------------------------------------------------------------
 
-    def render(self) -> Text:
-        height = int(self.size.height)
-        width = int(self.size.width)
+    def render_line(self, y: int) -> Strip:
+        width = self.size.width
+        if width <= 0:
+            return Strip.blank(0)
 
-        if height <= 0 or width <= 0:
-            return Text("")
+        # Adjust scroll on the first line of each frame.
+        if y == 0:
+            self._adjust_scroll(self.size.height)
 
         lines = self.buffer.get_lines()
         num_lines = len(lines)
-        gutter_w = max(len(str(num_lines)), 3) + 1  # e.g. "  1 " = 4 chars
-        text_w = max(width - gutter_w, 1)
+        gutter_w = max(len(str(num_lines)), 3) + 1
 
-        self._adjust_scroll(height)
-
+        line_idx = self._scroll_y + y
         cy = self.buffer.cursor_y
         cx = self.buffer.cursor_x
+        is_cursor = (line_idx == cy)
 
-        result = Text(no_wrap=True, overflow="crop")
+        segs: list[Segment] = []
+        used = 0
 
-        for row in range(height):
-            if row > 0:
-                result.append("\n")
+        if line_idx < num_lines:
+            # Gutter
+            num_str = f"{line_idx + 1:>{gutter_w - 1}} "
+            segs.append(Segment(num_str, _S_ACCENT if is_cursor else _S_DIM))
+            used += len(num_str)
 
-            line_idx = self._scroll_y + row
-            is_cursor_row = (line_idx == cy)
+            text_w = max(width - gutter_w, 0)
+            line = lines[line_idx]
 
-            if line_idx < num_lines:
-                # --- gutter ---
-                num_str = f"{line_idx + 1:>{gutter_w - 1}} "
-                gutter_color = "#00d4ff" if is_cursor_row else "#586069"
-                result.append(num_str, style=Style(color=gutter_color))
+            if is_cursor:
+                before = line[:cx][:text_w]
+                segs.append(Segment(before, _S_LINE_BG))
+                used += len(before)
+                remaining = text_w - len(before)
 
-                line = lines[line_idx]
+                if remaining > 0:
+                    cur_ch = line[cx] if cx < len(line) else " "
+                    segs.append(Segment(cur_ch, _S_CURSOR))
+                    used += 1
+                    remaining -= 1
 
-                if is_cursor_row:
-                    line_bg = Style(bgcolor="#111827", color="#c9d1d9")
-                    cursor_style = Style(bgcolor="#00d4ff", color="#0a0e14", bold=True)
+                if remaining > 0:
+                    after = (line[cx + 1:] if cx < len(line) else "")[:remaining]
+                    segs.append(Segment(after, _S_LINE_BG))
+                    used += len(after)
+                    remaining -= len(after)
 
-                    # text before cursor
-                    before = line[:cx]
-                    result.append(before[:text_w], style=line_bg)
-                    remaining = text_w - min(len(before), text_w)
-
-                    if remaining > 0:
-                        # cursor character
-                        cur_ch = line[cx] if cx < len(line) else " "
-                        result.append(cur_ch, style=cursor_style)
-                        remaining -= 1
-
-                    if remaining > 0:
-                        # text after cursor
-                        after = line[cx + 1:] if cx < len(line) else ""
-                        chunk = after[:remaining]
-                        result.append(chunk, style=line_bg)
-                        remaining -= len(chunk)
-
-                    if remaining > 0:
-                        # pad to end of line so the bg highlight fills the row
-                        result.append(" " * remaining, style=line_bg)
-                else:
-                    result.append(line[:text_w], style=Style(color="#c9d1d9"))
-
+                if remaining > 0:
+                    segs.append(Segment(" " * remaining, _S_LINE_BG))
+                    used += remaining
             else:
-                # past end of file: tilde rows
-                result.append(" " * (gutter_w - 1) + " ", style=Style(color="#586069"))
-                result.append("~", style=Style(color="#586069", dim=True))
+                text = line[:text_w]
+                segs.append(Segment(text, _S_TEXT))
+                used += len(text)
+        else:
+            # Past end of file -- tilde rows like vim
+            gutter = " " * (gutter_w - 1) + " "
+            segs.append(Segment(gutter, _S_DIM))
+            used += len(gutter)
+            segs.append(Segment("~", _S_TILDE))
+            used += 1
 
-        return result
+        # Pad to widget width with plain background
+        if used < width:
+            segs.append(Segment(" " * (width - used), _S_BG))
+
+        return Strip(segs, width)
 
     # ------------------------------------------------------------------
     # Input
@@ -200,13 +211,11 @@ class EditorWidget(Widget):
     def _handle_normal(self, key: str, char: str | None) -> None:
         self._status_msg = ""
 
-        # Two-key sequence guards must be checked first.
         if self._pending_d:
             self._pending_d = False
             if char == "d":
                 self.buffer.delete_line()
                 return
-            # Fall through to process the new key normally.
 
         elif self._pending_g:
             self._pending_g = False
@@ -214,7 +223,6 @@ class EditorWidget(Widget):
                 self.buffer.move_to_first_line()
                 return
 
-        # Single-key bindings
         if key in ("h", "left"):
             self.buffer.move_left()
         elif key in ("j", "down"):
